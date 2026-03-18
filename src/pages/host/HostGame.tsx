@@ -1,12 +1,40 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import BauhausButton from "@/components/BauhausButton";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 
+interface AddedPlayer {
+  email: string;
+  username: string;
+}
+
 const HostGame = () => {
   const { gamePin } = useParams<{ gamePin: string }>();
   const navigate = useNavigate();
+  const [playerEmail, setPlayerEmail] = useState("");
+  const [addingPlayer, setAddingPlayer] = useState(false);
+  const [addedPlayers, setAddedPlayers] = useState<AddedPlayer[]>([]);
+
+  const handleAddPlayer = async () => {
+    if (!playerEmail.trim()) {
+      toast.error("enter a player email.");
+      return;
+    }
+    setAddingPlayer(true);
+    try {
+      const data = await api.addPlayer(gamePin!, playerEmail.trim());
+      const username = data.username || data.nickname || data.name || data.player?.name || "unknown";
+      setAddedPlayers((prev) => [...prev, { email: playerEmail.trim(), username }]);
+      toast.success(`player added: ${username}`);
+      setPlayerEmail("");
+    } catch (err: any) {
+      toast.error(err.message || "failed to add player.");
+    } finally {
+      setAddingPlayer(false);
+    }
+  };
 
   const handleStart = async () => {
     try {
