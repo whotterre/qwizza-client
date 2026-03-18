@@ -75,14 +75,55 @@ const HostGame = () => {
             <h2 className="text-4xl font-display font-black tracking-tighter">game {gamePin}</h2>
           </div>
 
+          {/* Add Player */}
           <div className="border-2 border-foreground p-8 w-full">
-            <p className="text-xs uppercase tracking-[0.2em] font-body font-medium text-muted-foreground mb-4">players joined</p>
-            <div className="animate-pulse-block bg-secondary border-2 border-foreground p-6 text-center">
-              <p className="font-display font-black text-xl tracking-tighter">waiting for players...</p>
-              <p className="text-xs uppercase tracking-[0.2em] font-body text-muted-foreground mt-2">
-                share pin: {gamePin}
-              </p>
+            <p className="text-xs uppercase tracking-[0.2em] font-body font-medium text-muted-foreground mb-4">add player by email</p>
+            <div className="flex gap-3">
+              <input
+                type="email"
+                value={playerEmail}
+                onChange={(e) => setPlayerEmail(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAddPlayer()}
+                placeholder="player@email.com"
+                className="flex-1 px-4 py-3 border-2 border-foreground bg-background font-body focus:outline-none"
+              />
+              <BauhausButton color="primary" onClick={handleAddPlayer} disabled={addingPlayer}>
+                {addingPlayer ? "adding..." : "add"}
+              </BauhausButton>
             </div>
+          </div>
+
+          {/* Players list */}
+          <div className="border-2 border-foreground p-8 w-full">
+            <p className="text-xs uppercase tracking-[0.2em] font-body font-medium text-muted-foreground mb-4">players ({addedPlayers.length})</p>
+            {addedPlayers.length === 0 ? (
+              <div className="animate-pulse-block bg-secondary border-2 border-foreground p-6 text-center">
+                <p className="font-display font-black text-xl tracking-tighter">no players yet.</p>
+                <p className="text-xs uppercase tracking-[0.2em] font-body text-muted-foreground mt-2">
+                  add players above or share pin: {gamePin}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-0">
+                {addedPlayers.map((p, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ x: 40, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ duration: 0.2, delay: i * 0.03, ease: [0, 0, 0, 1] }}
+                    className="border-2 border-foreground border-b-0 last:border-b-2 p-4 flex items-center justify-between bg-background hover:bg-secondary transition-colors"
+                  >
+                    <div>
+                      <p className="font-display font-black tracking-tighter">{p.username}</p>
+                      <p className="text-xs font-body text-muted-foreground">{p.email}</p>
+                    </div>
+                    <div className="bg-accent border-2 border-foreground px-3 py-1">
+                      <p className="text-xs uppercase tracking-[0.2em] font-body font-bold text-accent-foreground">joined</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
           </div>
 
           <BauhausButton color="foreground" onClick={handleStart} className="w-full md:w-auto">
