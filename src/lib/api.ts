@@ -63,4 +63,7 @@ export const api = {
 
   joinGame: (pin: string, nickname: string) =>
     request(`/game/join/${pin}`, { method: "POST", body: JSON.stringify({ nickname }) }),
+
+  addPlayer: (pin: string, email: string) =>
+    request(`/games/${pin}/players`, { method: "POST", body: JSON.stringify({ email }) }),
 };
