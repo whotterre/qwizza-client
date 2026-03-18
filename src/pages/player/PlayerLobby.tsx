@@ -1,9 +1,19 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { Volume2, VolumeX } from "lucide-react";
+import { useState } from "react";
+import { useJazzMusic } from "@/hooks/useJazzMusic";
 
 const PlayerLobby = () => {
   const { gamePin } = useParams<{ gamePin: string }>();
   const navigate = useNavigate();
+  const [muted, setMuted] = useState(false);
+  const { toggle } = useJazzMusic(true);
+
+  const handleToggleMute = () => {
+    toggle();
+    setMuted(!muted);
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -39,8 +49,21 @@ const PlayerLobby = () => {
               </p>
             </div>
 
-            <p className="text-xs uppercase tracking-[0.2em] font-body text-muted-foreground">
-              stay on this page. the game will begin shortly.
+            <div className="flex items-center justify-center gap-3">
+              <p className="text-xs uppercase tracking-[0.2em] font-body text-muted-foreground">
+                stay on this page. the game will begin shortly.
+              </p>
+              <button
+                onClick={handleToggleMute}
+                className="border-2 border-foreground p-2 bg-background hover:bg-secondary transition-colors"
+                aria-label={muted ? "Unmute jazz" : "Mute jazz"}
+              >
+                {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+              </button>
+            </div>
+
+            <p className="text-[10px] uppercase tracking-[0.2em] font-body text-muted-foreground opacity-60">
+              ♪ click anywhere to start the jazz ♪
             </p>
           </motion.div>
         </div>
