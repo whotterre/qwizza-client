@@ -1,9 +1,19 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { Volume2, VolumeX } from "lucide-react";
+import { useState } from "react";
+import { useJazzMusic } from "@/hooks/useJazzMusic";
 
 const PlayerLobby = () => {
   const { gamePin } = useParams<{ gamePin: string }>();
   const navigate = useNavigate();
+  const [muted, setMuted] = useState(false);
+  const { toggle } = useJazzMusic(true);
+
+  const handleToggleMute = () => {
+    toggle();
+    setMuted(!muted);
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
