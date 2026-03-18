@@ -67,8 +67,8 @@ const JoinGame = () => {
                 maxLength={32}
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
-                placeholder="your name"
-                className="w-full px-6 py-4 border-2 border-foreground bg-background text-foreground font-display font-bold text-xl focus:outline-none focus:bg-secondary placeholder:text-muted-foreground lowercase"
+                placeholder="your nickname"
+                className="w-full px-6 py-4 border-2 border-foreground bg-background text-foreground font-display font-bold text-xl focus:outline-none focus:bg-secondary placeholder:text-muted-foreground uppercase"
               />
             </div>
 
