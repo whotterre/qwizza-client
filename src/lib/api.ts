@@ -56,8 +56,8 @@ export const api = {
   addQuiz: (pin: string, title: string) =>
     request(`/games/${pin}/quiz`, { method: "POST", body: JSON.stringify({ title }) }),
 
-  addQuestions: (quizId: number, questions: { content: string; correct_answer: string; answers: string[] }[]) =>
-    request(`/quizzes/${quizId}/questions`, { method: "POST", body: JSON.stringify({ questions }) }),
+  addQuestions: (quizId: number, questions: { content: string; correct_answer: string }[]) =>
+    request(`/quizzes/${quizId}/questions`, { method: "POST", body: JSON.stringify({ "items" : questions }) }),
 
   initializeGame: (pin: string) => request(`/game/initialize/${pin}`),
 
