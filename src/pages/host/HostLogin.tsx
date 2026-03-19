@@ -19,7 +19,13 @@ const HostLogin = () => {
     setLoading(true);
     try {
       const data = await api.login(email, password);
-      setToken(data.token);
+      
+      if (!data.user?.token) {
+        toast.error("Login failed: no authentication token received");
+        return;
+      }
+      
+      setToken(data.user.token);
       setStoredUser(data.user);
       navigate("/host/dashboard");
     } catch (err: any) {

@@ -1,14 +1,52 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Volume2, VolumeX } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useJazzMusic } from "@/hooks/useJazzMusic";
+import { useSocket } from "@/hooks/useSocket";
+import { toast } from "sonner";
 
 const PlayerLobby = () => {
   const { gamePin } = useParams<{ gamePin: string }>();
   const navigate = useNavigate();
   const [muted, setMuted] = useState(false);
+  const [connected, setConnected] = useState(false);
   const { toggle } = useJazzMusic(true);
+  const nickname = localStorage.getItem("qwizza_player_nickname");
+
+  useEffect(() => {
+    console.log("[PlayerLobby] Data check - gamePin:", gamePin, "nickname:", nickname);
+  }, [gamePin, nickname]);
+  
+  const { emit, on } = useSocket({
+    onConnect: () => {
+      console.log("[PlayerLobby] Socket connected, emitting PLAYER_JOIN with gamePin:", gamePin, "nickname:", nickname);
+      setConnected(true);
+      emit("PLAYER_JOIN", { gamePin, nickname });
+    },
+    onDisconnect: () => setConnected(false),
+    onError: (error) => console.error("Socket error:", error),
+  });
+
+  useEffect(() => {
+    const onSubscribe = on("QUESTION", (payload) => {
+      console.log("[PlayerLobby] QUESTION event received, navigating to game:", gamePin);
+      navigate(`/player/game/${gamePin}`);
+    });
+
+    return onSubscribe;
+  }, [on, navigate, gamePin]);
+
+  useEffect(() => {
+    const onSubscribe = on("PLAYER_JOINED", (payload: { nickname: string }) => {
+      const currentNickname = localStorage.getItem("qwizza_player_nickname");
+      if (payload.nickname !== currentNickname) {
+        toast.info(`${payload.nickname} joined the lobby!`);
+      }
+    });
+
+    return onSubscribe;
+  }, [on]);
 
   const handleToggleMute = () => {
     toggle();
@@ -43,9 +81,9 @@ const PlayerLobby = () => {
             </div>
 
             <div className="animate-pulse-block border-2 border-foreground p-12 bg-secondary">
-              <p className="font-display font-black text-2xl tracking-tighter">waiting</p>
+              <p className="font-display font-black text-2xl tracking-tighter">{connected ? "ready" : "waiting"}</p>
               <p className="text-xs uppercase tracking-[0.2em] font-body text-muted-foreground mt-2">
-                for host to start the game...
+                {connected ? "for host to start the game..." : "to connect..."}
               </p>
             </div>
 
