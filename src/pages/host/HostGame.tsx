@@ -4,11 +4,24 @@ import { motion } from "framer-motion";
 import BauhausButton from "@/components/BauhausButton";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { Plus, Trash2, CheckCircle } from "lucide-react";
 
 interface AddedPlayer {
   email: string;
   username: string;
 }
+
+interface QuestionDraft {
+  content: string;
+  correct_answer: string;
+  answers: string[];
+}
+
+const emptyQuestion = (): QuestionDraft => ({
+  content: "",
+  correct_answer: "",
+  answers: ["", "", "", ""],
+});
 
 const HostGame = () => {
   const { gamePin } = useParams<{ gamePin: string }>();
@@ -16,6 +29,14 @@ const HostGame = () => {
   const [playerEmail, setPlayerEmail] = useState("");
   const [addingPlayer, setAddingPlayer] = useState(false);
   const [addedPlayers, setAddedPlayers] = useState<AddedPlayer[]>([]);
+
+  // Quiz state
+  const [quizTitle, setQuizTitle] = useState("");
+  const [quizId, setQuizId] = useState<number | null>(null);
+  const [creatingQuiz, setCreatingQuiz] = useState(false);
+  const [questions, setQuestions] = useState<QuestionDraft[]>([emptyQuestion()]);
+  const [savingQuestions, setSavingQuestions] = useState(false);
+  const [savedQuestions, setSavedQuestions] = useState(false);
 
   const handleAddPlayer = async () => {
     if (!playerEmail.trim()) {
@@ -36,6 +57,82 @@ const HostGame = () => {
     }
   };
 
+  const handleCreateQuiz = async () => {
+    if (!quizTitle.trim()) {
+      toast.error("enter a quiz title.");
+      return;
+    }
+    setCreatingQuiz(true);
+    try {
+      const data = await api.addQuiz(gamePin!, quizTitle.trim());
+      const id = data.quiz_id || data.q_id || data.id || data.quiz?.q_id;
+      setQuizId(id);
+      toast.success("quiz created. now add questions.");
+    } catch (err: any) {
+      toast.error(err.message || "failed to create quiz.");
+    } finally {
+      setCreatingQuiz(false);
+    }
+  };
+
+  const updateQuestion = (idx: number, field: keyof QuestionDraft, value: string) => {
+    setQuestions((prev) =>
+      prev.map((q, i) => (i === idx ? { ...q, [field]: value } : q))
+    );
+  };
+
+  const updateAnswer = (qIdx: number, aIdx: number, value: string) => {
+    setQuestions((prev) =>
+      prev.map((q, i) =>
+        i === qIdx ? { ...q, answers: q.answers.map((a, j) => (j === aIdx ? value : a)) } : q
+      )
+    );
+  };
+
+  const setCorrectAnswer = (qIdx: number, aIdx: number) => {
+    setQuestions((prev) =>
+      prev.map((q, i) =>
+        i === qIdx ? { ...q, correct_answer: q.answers[aIdx] } : q
+      )
+    );
+  };
+
+  const addQuestion = () => setQuestions((prev) => [...prev, emptyQuestion()]);
+
+  const removeQuestion = (idx: number) => {
+    if (questions.length <= 1) return;
+    setQuestions((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleSaveQuestions = async () => {
+    if (!quizId) {
+      toast.error("create a quiz first.");
+      return;
+    }
+    const valid = questions.every(
+      (q) => q.content.trim() && q.correct_answer.trim() && q.answers.filter((a) => a.trim()).length >= 2
+    );
+    if (!valid) {
+      toast.error("each question needs content, at least 2 answers, and a correct answer selected.");
+      return;
+    }
+    setSavingQuestions(true);
+    try {
+      const cleaned = questions.map((q) => ({
+        content: q.content.trim(),
+        correct_answer: q.correct_answer.trim(),
+        answers: q.answers.filter((a) => a.trim()),
+      }));
+      await api.addQuestions(quizId, cleaned);
+      toast.success(`${cleaned.length} question(s) saved.`);
+      setSavedQuestions(true);
+    } catch (err: any) {
+      toast.error(err.message || "failed to save questions.");
+    } finally {
+      setSavingQuestions(false);
+    }
+  };
+
   const handleStart = async () => {
     try {
       await api.initializeGame(gamePin!);
@@ -44,6 +141,13 @@ const HostGame = () => {
       toast.error(err.message || "failed to start game.");
     }
   };
+
+  const answerColors = [
+    "bg-primary text-primary-foreground",
+    "bg-accent text-accent-foreground",
+    "bg-secondary text-secondary-foreground",
+    "bg-foreground text-background",
+  ];
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -69,10 +173,123 @@ const HostGame = () => {
         </motion.div>
 
         {/* Control */}
-        <div className="md:col-span-9 p-8 md:p-16 flex flex-col items-start justify-center gap-8">
+        <div className="md:col-span-9 p-8 md:p-16 flex flex-col items-start justify-start gap-8 overflow-y-auto">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] font-body font-medium text-muted-foreground mb-2">control room</p>
             <h2 className="text-4xl font-display font-black tracking-tighter">game {gamePin}</h2>
+          </div>
+
+          {/* Quiz Section */}
+          <div className="border-2 border-foreground w-full">
+            <div className="bg-primary p-6 border-b-2 border-foreground">
+              <p className="text-xs uppercase tracking-[0.2em] font-body font-bold text-primary-foreground">quiz editor</p>
+            </div>
+            <div className="p-8">
+              {!quizId ? (
+                <div className="space-y-4">
+                  <p className="text-xs uppercase tracking-[0.2em] font-body font-medium text-muted-foreground">step 1 — create a quiz</p>
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
+                      value={quizTitle}
+                      onChange={(e) => setQuizTitle(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleCreateQuiz()}
+                      placeholder="quiz title"
+                      className="flex-1 px-4 py-3 border-2 border-foreground bg-background font-body focus:outline-none"
+                    />
+                    <BauhausButton color="primary" onClick={handleCreateQuiz} disabled={creatingQuiz}>
+                      {creatingQuiz ? "creating..." : "create quiz"}
+                    </BauhausButton>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] font-body font-medium text-muted-foreground">step 2 — add questions</p>
+                      <p className="font-display font-black text-lg tracking-tighter mt-1">"{quizTitle}"</p>
+                    </div>
+                    {savedQuestions && (
+                      <div className="bg-accent border-2 border-foreground px-3 py-1 flex items-center gap-2">
+                        <CheckCircle className="w-3 h-3" />
+                        <p className="text-xs uppercase tracking-[0.2em] font-body font-bold text-accent-foreground">saved</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {questions.map((q, qIdx) => (
+                    <motion.div
+                      key={qIdx}
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ duration: 0.2, delay: qIdx * 0.05, ease: [0, 0, 0, 1] }}
+                      className="border-2 border-foreground"
+                    >
+                      <div className="bg-secondary p-4 border-b-2 border-foreground flex items-center justify-between">
+                        <p className="text-xs uppercase tracking-[0.2em] font-body font-bold">question {qIdx + 1}</p>
+                        {questions.length > 1 && (
+                          <button onClick={() => removeQuestion(qIdx)} className="text-muted-foreground hover:text-foreground transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      <div className="p-6 space-y-4">
+                        <input
+                          type="text"
+                          value={q.content}
+                          onChange={(e) => updateQuestion(qIdx, "content", e.target.value)}
+                          placeholder="enter your question"
+                          className="w-full px-4 py-3 border-2 border-foreground bg-background font-body text-lg focus:outline-none"
+                        />
+                        <p className="text-xs uppercase tracking-[0.2em] font-body font-medium text-muted-foreground">
+                          answers — click to mark correct
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {q.answers.map((a, aIdx) => (
+                            <div key={aIdx} className="flex gap-2">
+                              <input
+                                type="text"
+                                value={a}
+                                onChange={(e) => updateAnswer(qIdx, aIdx, e.target.value)}
+                                placeholder={`option ${aIdx + 1}`}
+                                className={`flex-1 px-4 py-3 border-2 border-foreground font-body focus:outline-none ${
+                                  q.correct_answer && q.correct_answer === a && a.trim()
+                                    ? answerColors[aIdx % answerColors.length]
+                                    : "bg-background"
+                                }`}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (a.trim()) setCorrectAnswer(qIdx, aIdx);
+                                }}
+                                className={`w-12 border-2 border-foreground flex items-center justify-center transition-colors ${
+                                  q.correct_answer && q.correct_answer === a && a.trim()
+                                    ? "bg-accent text-accent-foreground"
+                                    : "bg-background text-muted-foreground hover:bg-secondary"
+                                }`}
+                                title="mark as correct"
+                              >
+                                <CheckCircle className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+
+                  <div className="flex gap-3 flex-wrap">
+                    <BauhausButton color="secondary" onClick={addQuestion}>
+                      <span className="flex items-center gap-2"><Plus className="w-4 h-4" /> add question</span>
+                    </BauhausButton>
+                    <BauhausButton color="primary" onClick={handleSaveQuestions} disabled={savingQuestions}>
+                      {savingQuestions ? "saving..." : `save ${questions.length} question(s)`}
+                    </BauhausButton>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Add Player */}
