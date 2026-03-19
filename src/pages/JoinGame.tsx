@@ -20,6 +20,7 @@ const JoinGame = () => {
     setLoading(true);
     try {
       await api.joinGame(pin, nickname.trim());
+      localStorage.setItem("qwizza_player_nickname", nickname.trim());
       navigate(`/player/lobby/${pin}`);
     } catch (err: any) {
       toast.error(err.message || "failed to join game.");

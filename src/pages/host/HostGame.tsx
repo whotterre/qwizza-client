@@ -121,7 +121,6 @@ const HostGame = () => {
       const cleaned = questions.map((q) => ({
         content: q.content.trim(),
         correct_answer: q.correct_answer.trim(),
-        answers: q.answers.filter((a) => a.trim()),
       }));
       await api.addQuestions(quizId, cleaned);
       toast.success(`${cleaned.length} question(s) saved.`);
