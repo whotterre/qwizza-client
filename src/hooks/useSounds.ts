@@ -1,0 +1,106 @@
+import { useRef, useCallback } from "react"
+import bossa from "../assets/sounds/bossa.mp3"
+
+const generateAnswerSelectSound = (): HTMLAudioElement => {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const oscillator = audioContext.createOscillator()
+    const gainNode = audioContext.createGain()
+    
+    oscillator.connect(gainNode)
+    gainNode.connect(audioContext.destination)
+    
+    oscillator.frequency.value = 800
+    oscillator.type = "sine"
+    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime)
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2)
+    
+    oscillator.start(audioContext.currentTime)
+    oscillator.stop(audioContext.currentTime + 0.2)
+    
+    return new Audio()
+}
+
+const generateGameEndSound = (): Promise<void> => {
+    return new Promise((resolve) => {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+        const now = audioContext.currentTime
+        
+        const notes = [523.25, 659.25, 783.99] // C5, E5, G5
+        const durations = [0.2, 0.2, 0.4]
+        let currentTime = now
+        
+        notes.forEach((freq, i) => {
+            const oscillator = audioContext.createOscillator()
+            const gainNode = audioContext.createGain()
+            
+            oscillator.connect(gainNode)
+            gainNode.connect(audioContext.destination)
+            
+            oscillator.frequency.value = freq
+            oscillator.type = "sine"
+            gainNode.gain.setValueAtTime(0.1, currentTime)
+            gainNode.gain.exponentialRampToValueAtTime(0.01, currentTime + durations[i])
+            
+            oscillator.start(currentTime)
+            oscillator.stop(currentTime + durations[i])
+            
+            currentTime += durations[i] + 0.05
+        })
+        
+        setTimeout(resolve, (currentTime - now) * 1000)
+    })
+}
+
+const sounds = {
+    "lobby": bossa,
+    "answerSelect": "",
+    "gameEnd": ""
+}
+
+export default function useSound(audioType: string) {
+    const audioRef = useRef<HTMLAudioElement | null>(null)
+    
+    const play = useCallback(async () => {
+        try {
+            if (audioType === "answerSelect") {
+                generateAnswerSelectSound()
+            } else if (audioType === "gameEnd") {
+                await generateGameEndSound()
+            } else if (audioRef.current) {
+                audioRef.current.currentTime = 0
+                await audioRef.current.play()
+            }
+        } catch (err) {
+            console.error("Failed to play audio:", err)
+        }
+    }, [audioType])
+
+    const stop = useCallback(() => {
+        if (audioRef.current) {
+            audioRef.current.pause()
+            audioRef.current.currentTime = 0
+        }
+    }, [])
+
+    let selectedAudio = ""
+    switch (audioType) {
+        case "lobby":
+        case "bossa":
+            selectedAudio = sounds["lobby"]
+            break
+        case "answerSelect":
+            selectedAudio = sounds["answerSelect"]
+            break
+        case "gameEnd":
+            selectedAudio = sounds["gameEnd"]
+            break
+        default:
+            throw new Error("Invalid sound type.")
+    }
+
+    if (selectedAudio) {
+        audioRef.current = new Audio(selectedAudio)
+    }
+
+    return { play, stop, audio: audioRef.current }
+}

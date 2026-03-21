@@ -2,17 +2,25 @@ import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Volume2, VolumeX } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useJazzMusic } from "@/hooks/useJazzMusic";
 import { useSocket } from "@/hooks/useSocket";
 import { toast } from "sonner";
+import useSounds from "@/hooks/useSounds";
 
 const PlayerLobby = () => {
   const { gamePin } = useParams<{ gamePin: string }>();
   const navigate = useNavigate();
   const [muted, setMuted] = useState(false);
   const [connected, setConnected] = useState(false);
-  const { toggle } = useJazzMusic(true);
+  const { play, stop } = useSounds("lobby");
   const nickname = localStorage.getItem("qwizza_player_nickname");
+
+  useEffect(() => {
+    if (!muted) {
+      play();
+    } else {
+      stop();
+    }
+  }, [muted, play, stop]);
 
   useEffect(() => {
     console.log("[PlayerLobby] Data check - gamePin:", gamePin, "nickname:", nickname);
@@ -49,7 +57,6 @@ const PlayerLobby = () => {
   }, [on]);
 
   const handleToggleMute = () => {
-    toggle();
     setMuted(!muted);
   };
 
