@@ -26,7 +26,7 @@ const AnswerBlock = ({ label, color, onClick, disabled, selected }: AnswerBlockP
     animate={{ x: 0 }}
     transition={{ duration: 0.2, ease: [0, 0, 0, 1] }}
     className={cn(
-      "w-full aspect-square border-2 border-foreground flex items-center justify-center font-display font-black text-xl md:text-2xl uppercase tracking-wider p-4",
+      "w-full aspect-square border-2 border-foreground flex items-center justify-center font-display font-black text-lg md:text-xl uppercase tracking-wider p-2",
       colorMap[color],
       selected && "ring-4 ring-foreground",
       disabled && "opacity-70 cursor-not-allowed"

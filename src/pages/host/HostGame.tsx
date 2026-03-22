@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import BauhausButton from "@/components/BauhausButton";
 import { api } from "@/lib/api";
@@ -9,12 +9,21 @@ import { Plus, Trash2, CheckCircle } from "lucide-react";
 interface AddedPlayer {
   email: string;
   username: string;
+  nicknameId?: number; 
+  gameId?: number;
 }
 
 interface QuestionDraft {
+  qu_id?: number;
   content: string;
   correct_answer: string;
   answers: string[];
+}
+
+interface Answer {
+  a_id: number;
+  qu_id: number;
+  content: string;
 }
 
 const emptyQuestion = (): QuestionDraft => ({
@@ -26,9 +35,12 @@ const emptyQuestion = (): QuestionDraft => ({
 const HostGame = () => {
   const { gamePin } = useParams<{ gamePin: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const gameId = (location.state as any)?.gameId;
   const [playerEmail, setPlayerEmail] = useState("");
   const [addingPlayer, setAddingPlayer] = useState(false);
   const [addedPlayers, setAddedPlayers] = useState<AddedPlayer[]>([]);
+  const [loadingNicknames, setLoadingNicknames] = useState(false);
 
   // Quiz state
   const [quizTitle, setQuizTitle] = useState("");
@@ -37,6 +49,119 @@ const HostGame = () => {
   const [questions, setQuestions] = useState<QuestionDraft[]>([emptyQuestion()]);
   const [savingQuestions, setSavingQuestions] = useState(false);
   const [savedQuestions, setSavedQuestions] = useState(false);
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
+  const [updatingQuestionId, setUpdatingQuestionId] = useState<number | null>(null);
+  const [questionAnswerMap, setQuestionAnswerMap] = useState<Record<number, Answer[]>>({});
+
+  // Auto-load existing quiz when page opens
+  useEffect(() => {
+    const loadExistingQuiz = async () => {
+      if (!gameId) {
+        return;
+      }
+
+      try {
+        const data = await api.getGameById(String(gameId));
+        const gameData = data || (data.quiz ? { quiz: data.quiz } : {});
+        const quizId = gameData.quiz?.q_id || gameData.quiz?.id || gameData.quizId;
+        
+        if (quizId) {
+          setQuizId(quizId);
+          const quizTitle = gameData.quiz?.title || gameData.title || "Quiz";
+          setQuizTitle(quizTitle);
+          
+          if (gameData.quiz?.questions) {
+            const loadedQuestions: QuestionDraft[] = gameData.quiz.questions.map((q: any) => ({
+              qu_id: q.qu_id,
+              content: q.content,
+              correct_answer: q.correct_answer,
+              answers: (q.answers || []).map((a: Answer) => a.content),
+            }));
+            setQuestions(loadedQuestions);
+            setSavedQuestions(true);
+            toast.success(`loaded ${loadedQuestions.length} existing question(s).`);
+          }
+        }
+      } catch (err: any) {
+        // No quiz yet, that's fine - user will create one
+      }
+    };
+
+    loadExistingQuiz();
+  }, [gameId]);
+
+  // Load nicknames when gameId is set
+  useEffect(() => {
+    const loadNicknames = async () => {
+      if (!gameId) return;
+
+      setLoadingNicknames(true);
+      try {
+        const data = await api.getNicknames(gameId);
+        const nicknames = data.nicknames || [];
+        
+        const players: AddedPlayer[] = nicknames.map((nick: any) => ({
+          email: nick.email || "",
+          username: nick.name,
+          nicknameId: nick.n_id,
+          gameId: nick.g_id,
+        }));
+        
+        setAddedPlayers(players);
+        if (nicknames.length > 0) {
+          toast.success(`loaded ${nicknames.length} player(s).`);
+        }
+      } catch (err: any) {
+        // Silently fail - nicknames may not be available yet
+      } finally {
+        setLoadingNicknames(false);
+      }
+    };
+
+    loadNicknames();
+  }, [gameId]);
+
+  // Load existing questions when quizId is set
+  useEffect(() => {
+    if (!quizId) return;
+
+    const loadExistingQuestions = async () => {
+      setLoadingQuestions(true);
+      try {
+        const data = await api.loadQuiz(quizId);
+        const quizData = data.quiz || data;
+        
+        if (quizData.questions && quizData.questions.length > 0) {
+          // Map existing questions to draft format
+          const loadedQuestions: QuestionDraft[] = quizData.questions.map(
+            (q: any) => ({
+              qu_id: q.qu_id,
+              content: q.content,
+              correct_answer: q.correct_answer,
+              answers: (q.answers || []).map((a: Answer) => a.content),
+            })
+          );
+          
+          // Build answer map for reference
+          const answerMap: Record<number, Answer[]> = {};
+          quizData.questions.forEach((q: any) => {
+            answerMap[q.qu_id] = q.answers || [];
+          });
+          setQuestionAnswerMap(answerMap);
+          
+          setQuestions(loadedQuestions);
+          setSavedQuestions(true);
+          toast.success(`loaded ${loadedQuestions.length} existing question(s).`);
+        }
+      } catch (err: any) {
+        // No existing questions found - new quiz
+      } finally {
+        setLoadingQuestions(false);
+      }
+    };
+
+    loadExistingQuestions();
+  }, [quizId]);
 
   const handleAddPlayer = async () => {
     if (!playerEmail.trim()) {
@@ -47,13 +172,44 @@ const HostGame = () => {
     try {
       const data = await api.addPlayer(gamePin!, playerEmail.trim());
       const username = data.username || data.nickname || data.name || data.player?.name || "unknown";
-      setAddedPlayers((prev) => [...prev, { email: playerEmail.trim(), username }]);
+      const nicknameId = data.n_id || data.nicknameId || data.nickname_id || data.id;
+      
+      setAddedPlayers((prev) => [
+        ...prev,
+        { 
+          email: playerEmail.trim(), 
+          username,
+          nicknameId,
+          gameId: data.g_id || data.gameId || data.game_id,
+        },
+      ]);
       toast.success(`player added: ${username}`);
       setPlayerEmail("");
     } catch (err: any) {
       toast.error(err.message || "failed to add player.");
     } finally {
       setAddingPlayer(false);
+    }
+  };
+
+  const handleDeleteNickname = async (player: AddedPlayer, index: number) => {
+    // If we don't have IDs, remove from local list only
+    if (!player.gameId || !player.nicknameId) {
+      setAddedPlayers((prev) => prev.filter((_, i) => i !== index));
+      toast.success(`${player.username} removed.`);
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to remove ${player.username} from the game?`)) {
+      return;
+    }
+
+    try {
+      await api.deleteNickname(player.gameId, player.nicknameId);
+      setAddedPlayers((prev) => prev.filter((_, i) => i !== index));
+      toast.success(`${player.username} removed from game.`);
+    } catch (err: any) {
+      toast.error(err.message || "failed to remove player.");
     }
   };
 
@@ -104,6 +260,28 @@ const HostGame = () => {
     setQuestions((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const handleUpdateQuestion = async (qIdx: number) => {
+    const q = questions[qIdx];
+    if (!q.qu_id) {
+      toast.error("Only existing questions can be updated individually.");
+      return;
+    }
+    if (!q.content.trim() || !q.correct_answer.trim()) {
+      toast.error("Question needs content and a correct answer.");
+      return;
+    }
+
+    setUpdatingQuestionId(q.qu_id);
+    try {
+      await api.updateQuestion(q.qu_id, q.content.trim(), q.correct_answer.trim());
+      toast.success("Question updated!");
+    } catch (err: any) {
+      toast.error(err.message || "failed to update question.");
+    } finally {
+      setUpdatingQuestionId(null);
+    }
+  };
+
   const handleSaveQuestions = async () => {
     if (!quizId) {
       toast.error("create a quiz first.");
@@ -118,12 +296,31 @@ const HostGame = () => {
     }
     setSavingQuestions(true);
     try {
-      const cleaned = questions.map((q) => ({
-        content: q.content.trim(),
-        correct_answer: q.correct_answer.trim(),
-      }));
-      await api.addQuestions(quizId, cleaned);
-      toast.success(`${cleaned.length} question(s) saved.`);
+      // Separate new questions from existing ones
+      const newQuestions = questions.filter(q => !q.qu_id);
+      const existingQuestions = questions.filter(q => q.qu_id);
+
+      // Save new questions
+      if (newQuestions.length > 0) {
+        const cleaned = newQuestions.map((q) => ({
+          content: q.content.trim(),
+          correct_answer: q.correct_answer.trim(),
+        }));
+        await api.addQuestions(quizId, cleaned);
+        toast.success(`${cleaned.length} new question(s) saved.`);
+      }
+
+      // Update existing questions
+      for (const q of existingQuestions) {
+        if (q.qu_id) {
+          await api.updateQuestion(q.qu_id, q.content.trim(), q.correct_answer.trim());
+        }
+      }
+
+      if (existingQuestions.length > 0) {
+        toast.success(`${existingQuestions.length} question(s) updated.`);
+      }
+
       setSavedQuestions(true);
     } catch (err: any) {
       toast.error(err.message || "failed to save questions.");
@@ -134,7 +331,12 @@ const HostGame = () => {
 
   const handleStart = async () => {
     try {
-      await api.initializeGame(gamePin!);
+      // Try the new startGame endpoint first, fall back to initializeGame
+      try {
+        await api.startGame(gamePin!);
+      } catch {
+        await api.initializeGame(gamePin!);
+      }
       toast.success("game started.");
     } catch (err: any) {
       toast.error(err.message || "failed to start game.");
@@ -226,11 +428,23 @@ const HostGame = () => {
                     >
                       <div className="bg-secondary p-4 border-b-2 border-foreground flex items-center justify-between">
                         <p className="text-xs uppercase tracking-[0.2em] font-body font-bold">question {qIdx + 1}</p>
-                        {questions.length > 1 && (
-                          <button onClick={() => removeQuestion(qIdx)} className="text-muted-foreground hover:text-foreground transition-colors">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {q.qu_id && (
+                            <button
+                              onClick={() => handleUpdateQuestion(qIdx)}
+                              disabled={updatingQuestionId === q.qu_id}
+                              className="text-xs uppercase tracking-[0.2em] font-body font-bold px-4 py-2 border-2 border-foreground bg-green-500 text-white hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              title="update this question"
+                            >
+                              {updatingQuestionId === q.qu_id ? "updating..." : "✓ update"}
+                            </button>
+                          )}
+                          {questions.length > 1 && (
+                            <button onClick={() => removeQuestion(qIdx)} className="text-muted-foreground hover:text-foreground transition-colors">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div className="p-6 space-y-4">
                         <input
@@ -333,8 +547,17 @@ const HostGame = () => {
                       <p className="font-display font-black tracking-tighter">{p.username}</p>
                       <p className="text-xs font-body text-muted-foreground">{p.email}</p>
                     </div>
-                    <div className="bg-accent border-2 border-foreground px-3 py-1">
-                      <p className="text-xs uppercase tracking-[0.2em] font-body font-bold text-accent-foreground">joined</p>
+                    <div className="flex items-center gap-3">
+                      <div className="bg-accent border-2 border-foreground px-3 py-1">
+                        <p className="text-xs uppercase tracking-[0.2em] font-body font-bold text-accent-foreground">joined</p>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteNickname(p, i)}
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                        title="remove player"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </motion.div>
                 ))}
@@ -343,7 +566,7 @@ const HostGame = () => {
           </div>
 
           <BauhausButton color="foreground" onClick={handleStart} className="w-full md:w-auto">
-            start machine
+            start game
           </BauhausButton>
         </div>
       </div>

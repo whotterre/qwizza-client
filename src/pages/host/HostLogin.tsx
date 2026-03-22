@@ -87,7 +87,7 @@ const HostLogin = () => {
             </div>
 
             <BauhausButton color="primary" onClick={handleLogin} disabled={loading} className="w-full">
-              {loading ? "logging in..." : "start machine"}
+              {loading ? "logging in..." : "log in"}
             </BauhausButton>
 
             <div className="flex items-center justify-between">

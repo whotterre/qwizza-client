@@ -47,8 +47,6 @@ const PlayerGame = () => {
   const [timeRemaining, setTimeRemaining] = useState(100);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [totalQuestions, setTotalQuestions] = useState(0);
-
-  // FIX: Track whether game has started to suppress noisy join toasts mid-game
   const [gameStarted, setGameStarted] = useState(false);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -72,22 +70,16 @@ const PlayerGame = () => {
       questionIdRef.current = payload.question.qu_id;
       windowTimesRef.current = { start: payload.windowStart, end: payload.windowEnd };
 
-      // FIX: Derive currentQuestion from `remaining` (what server actually sends)
-      // On first question, set total = remaining + 1 (remaining counts down from total-1)
       const total = totalQuestionsRef.current || payload.remaining + 1;
       totalQuestionsRef.current = total;
       setTotalQuestions(total);
       setCurrentQuestion(total - payload.remaining);
 
-      // release selected option and alternate answer locks
       setSelected(null);
       setAnswerLocked(false);
 
-      // Clear old timer
       if (timerRef.current) clearInterval(timerRef.current);
 
-      // FIX: Update every 1 second to match the CSS transition duration-1000,
-      // preventing stutter from mismatched 50ms interval vs 1s transition
       const updateTimer = () => {
         if (windowTimesRef.current) {
           const now = Date.now();

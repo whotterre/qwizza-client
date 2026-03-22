@@ -147,7 +147,7 @@ const HostDashboard = () => {
                   animate={{ x: 0 }}
                   transition={{ duration: 0.2, delay: i * 0.05, ease: [0, 0, 0, 1] }}
                   className="border-2 border-foreground border-b-0 last:border-b-2 p-6 flex items-center justify-between hover:bg-secondary transition-colors cursor-pointer"
-                  onClick={() => navigate(`/host/game/${game.gamePin}`)}
+                  onClick={() => navigate(`/host/game/${game.gamePin}`, { state: { gameId: game.game_id } })}
                 >
                   <div>
                     <h3 className="font-display font-black text-xl tracking-tighter">{game.name}</h3>

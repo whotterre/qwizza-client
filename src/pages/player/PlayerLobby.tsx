@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useSocket } from "@/hooks/useSocket";
 import { toast } from "sonner";
 import useSounds from "@/hooks/useSounds";
+import { api } from "@/lib/api";
 
 const PlayerLobby = () => {
   const { gamePin } = useParams<{ gamePin: string }>();
@@ -23,22 +24,21 @@ const PlayerLobby = () => {
   }, [muted, play, stop]);
 
   useEffect(() => {
-    console.log("[PlayerLobby] Data check - gamePin:", gamePin, "nickname:", nickname);
-  }, [gamePin, nickname]);
+    return () => {
+      stop();
+    };
+  }, [stop]);
   
   const { emit, on } = useSocket({
     onConnect: () => {
-      console.log("[PlayerLobby] Socket connected, emitting PLAYER_JOIN with gamePin:", gamePin, "nickname:", nickname);
       setConnected(true);
       emit("PLAYER_JOIN", { gamePin, nickname });
     },
     onDisconnect: () => setConnected(false),
-    onError: (error) => console.error("Socket error:", error),
   });
 
   useEffect(() => {
     const onSubscribe = on("QUESTION", (payload) => {
-      console.log("[PlayerLobby] QUESTION event received, navigating to game:", gamePin);
       navigate(`/player/game/${gamePin}`);
     });
 
