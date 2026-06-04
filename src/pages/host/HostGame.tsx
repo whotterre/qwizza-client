@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import BauhausButton from "@/components/BauhausButton";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { Plus, Trash2, CheckCircle } from "lucide-react";
+import { Sparkles, Plus, Trash2, CheckCircle } from "lucide-react";
 
 interface AddedPlayer {
   email: string;
@@ -18,6 +18,12 @@ interface QuestionDraft {
   content: string;
   correct_answer: string;
   answers: string[];
+}
+
+interface GeneratedQuestionPrompt {
+  topic: string;
+  count: number;
+  difficulty: string;
 }
 
 interface Answer {
@@ -52,6 +58,12 @@ const HostGame = () => {
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [updatingQuestionId, setUpdatingQuestionId] = useState<number | null>(null);
   const [questionAnswerMap, setQuestionAnswerMap] = useState<Record<number, Answer[]>>({});
+  const [generatingQuestions, setGeneratingQuestions] = useState(false);
+  const [generationPrompt, setGenerationPrompt] = useState<GeneratedQuestionPrompt>({
+    topic: "",
+    count: 5,
+    difficulty: "medium",
+  });
 
   // Auto-load existing quiz when page opens
   useEffect(() => {
@@ -83,7 +95,7 @@ const HostGame = () => {
           }
         }
       } catch (err: any) {
-        // No quiz yet, that's fine - user will create one
+        
       }
     };
 
@@ -255,6 +267,43 @@ const HostGame = () => {
 
   const addQuestion = () => setQuestions((prev) => [...prev, emptyQuestion()]);
 
+  const handleGenerateQuestions = async () => {
+    if (!quizId) {
+      toast.error("create a quiz first.");
+      return;
+    }
+
+    if (!generationPrompt.topic.trim()) {
+      toast.error("enter a topic for generated questions.");
+      return;
+    }
+
+    setGeneratingQuestions(true);
+    try {
+      const prompt = [
+        `Generate ${generationPrompt.count} quiz questions about ${generationPrompt.topic.trim()}.`,
+        `Difficulty: ${generationPrompt.difficulty}.`,
+        "Return JSON only with questions shaped like { content, correct_answer, answers }.",
+        "Each question must have exactly 4 answer choices and exactly one correct answer.",
+      ].join(" ");
+
+      const generatedQuestions = await api.generateQuestions(prompt);
+
+      const mappedQuestions = generatedQuestions.map((question) => ({
+        content: question.content,
+        correct_answer: question.correct_answer,
+        answers: question.answers,
+      }));
+
+      setQuestions((prev) => [...prev, ...mappedQuestions]);
+      toast.success(`generated ${mappedQuestions.length} question(s).`);
+    } catch (err: any) {
+      toast.error(err.message || "failed to generate questions.");
+    } finally {
+      setGeneratingQuestions(false);
+    }
+  };
+
   const removeQuestion = (idx: number) => {
     if (questions.length <= 1) return;
     setQuestions((prev) => prev.filter((_, i) => i !== idx));
@@ -416,6 +465,50 @@ const HostGame = () => {
                         <p className="text-xs uppercase tracking-[0.2em] font-body font-bold text-accent-foreground">saved</p>
                       </div>
                     )}
+                  </div>
+
+                  <div className="border-2 border-foreground bg-secondary p-6 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4" />
+                      <p className="text-xs uppercase tracking-[0.2em] font-body font-bold">generate questions with ai</p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <input
+                        type="text"
+                        value={generationPrompt.topic}
+                        onChange={(e) => setGenerationPrompt((prev) => ({ ...prev, topic: e.target.value }))}
+                        placeholder="topic, theme, or chapter"
+                        className="px-4 py-3 border-2 border-foreground bg-background font-body focus:outline-none"
+                      />
+                      <input
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={generationPrompt.count}
+                        onChange={(e) => setGenerationPrompt((prev) => ({ ...prev, count: Number(e.target.value) || 5 }))}
+                        className="px-4 py-3 border-2 border-foreground bg-background font-body focus:outline-none"
+                      />
+                      <select
+                        value={generationPrompt.difficulty}
+                        onChange={(e) => setGenerationPrompt((prev) => ({ ...prev, difficulty: e.target.value }))}
+                        className="px-4 py-3 border-2 border-foreground bg-background font-body focus:outline-none"
+                      >
+                        <option value="easy">easy</option>
+                        <option value="medium">medium</option>
+                        <option value="hard">hard</option>
+                      </select>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <BauhausButton color="secondary" onClick={handleGenerateQuestions} disabled={generatingQuestions}>
+                        <span className="flex items-center gap-2">
+                          <Sparkles className="w-4 h-4" />
+                          {generatingQuestions ? "generating..." : "generate draft questions"}
+                        </span>
+                      </BauhausButton>
+                      <p className="text-xs uppercase tracking-[0.2em] font-body font-medium text-muted-foreground">
+                        generated questions will be appended for editing before save
+                      </p>
+                    </div>
                   </div>
 
                   {questions.map((q, qIdx) => (
