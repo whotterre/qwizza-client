@@ -1,4 +1,7 @@
-const API_BASE = import.meta.env.VITE_API_URL || "https://qwizza-production.up.railway.app";
+const API_BASE = import.meta.env.VITE_API_URL
+const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
+const OPENROUTER_MODEL = import.meta.env.VITE_OPENROUTER_MODEL 
+const OPENROUTER_BASE_URL = import.meta.env.VITE_OPENROUTER_BASE_URL
 
 function getToken(): string | null {
   return localStorage.getItem("qwizza_token");
@@ -41,6 +44,98 @@ async function request(path: string, options: RequestInit = {}) {
   return res.json();
 }
 
+type GeneratedQuestion = {
+  content: string;
+  correct_answer: string;
+  answers: string[];
+};
+
+function normalizeGeneratedQuestions(data: unknown): GeneratedQuestion[] {
+  const rawQuestions =
+    Array.isArray(data) ? data :
+    typeof data === "object" && data !== null && Array.isArray((data as { questions?: unknown[] }).questions)
+      ? (data as { questions: unknown[] }).questions
+      : [];
+
+  return rawQuestions
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const question = item as Partial<GeneratedQuestion>;
+      const answers = Array.isArray(question.answers) ? question.answers.filter((answer) => typeof answer === "string") : [];
+
+      if (
+        typeof question.content !== "string" ||
+        typeof question.correct_answer !== "string" ||
+        answers.length !== 4
+      ) {
+        return null;
+      }
+
+      return {
+        content: question.content.trim(),
+        correct_answer: question.correct_answer.trim(),
+        answers: answers.map((answer) => answer.trim()).filter(Boolean),
+      };
+    })
+    .filter((question): question is GeneratedQuestion => Boolean(question && question.content && question.correct_answer && question.answers.length === 4));
+}
+
+async function generateQuestionsWithOpenRouter(prompt: string): Promise<GeneratedQuestion[]> {
+  if (!OPENROUTER_API_KEY) {
+    throw new Error("missing OpenRouter API key. set VITE_OPENROUTER_API_KEY in your env file.");
+  }
+
+  const res = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+      "HTTP-Referer": window.location.origin,
+      "X-Title": "Qwizza Quiz Generator",
+    },
+    body: JSON.stringify({
+      model: OPENROUTER_MODEL,
+      messages: [
+        {
+          role: "system",
+          content:
+            'Return only valid JSON in the exact shape {"questions":[{"content":"string","correct_answer":"string","answers":["string","string","string","string"]}]}. Each question must have exactly 4 answer choices and exactly one correct answer that appears in answers.',
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      temperature: 0.7,
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error?.message || body.message || `Request failed: ${res.status}`);
+  }
+
+  const data = await res.json();
+  const content = data?.choices?.[0]?.message?.content;
+
+  if (!content || typeof content !== "string") {
+    throw new Error("OpenRouter returned no completion.");
+  }
+
+  const cleaned = content.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "");
+  const parsed = JSON.parse(cleaned);
+  const questions = normalizeGeneratedQuestions(parsed);
+
+  if (questions.length === 0) {
+    throw new Error("OpenRouter returned invalid question data.");
+  }
+
+  return questions;
+}
+
 export const api = {
   signup: (email: string, password: string, role: string) =>
     request("/user/signup", { method: "POST", body: JSON.stringify({ email, password, role }) }),
@@ -59,6 +154,8 @@ export const api = {
 
   addQuestions: (quizId: number, questions: { content: string; correct_answer: string }[]) =>
     request(`/quizzes/${quizId}/questions`, { method: "POST", body: JSON.stringify({ "items" : questions }) }),
+
+  generateQuestions: (prompt: string) => generateQuestionsWithOpenRouter(prompt),
 
   loadQuiz: (quizId: number) =>
     request(`/quizzes/${quizId}`),

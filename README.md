@@ -17,10 +17,10 @@ A modern, multiplayer quiz game application built with React, TypeScript, and re
 - **Real-time Monitoring** - Track player scores and progress live
 - **Secure Authentication** - Login and signup for host accounts
 - **Session Management** - Monitor multiple concurrent games
+- **AI Assisted Quiz Question Generation** - Generate quiz questions with AI / LLM assistance instead of manually
 
 ### 🎨 Design & UX
 - **Bauhaus-inspired Components** - Bold, grid-based visual design
-- **Dark Mode Support** - Theme switching with next-themes
 - **Fully Responsive** - Optimized for desktop, tablet, and mobile
 - **Accessible UI** - Built with Radix UI primitives
 - **Custom Styling** - Tailwind CSS with custom components
@@ -206,10 +206,6 @@ Contributions are welcome! Please:
 3. Push to the branch
 4. Open a Pull Request
 
-## License
 
-This project is part of the Quiz Masters Hub initiative.
-
-## Support
-
-For issues and questions, please open an issue in the repository or contact the development team.
+## Acknowledgements
+Shoutout to Aim Michael for suggesting the AI-assisted question generation feature.
