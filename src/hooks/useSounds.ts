@@ -1,4 +1,4 @@
-import { useRef, useCallback } from "react"
+import { useRef, useCallback, useEffect } from "react"
 import bossa from "../assets/sounds/bossa.mp3"
 
 const generateAnswerSelectSound = (): HTMLAudioElement => {
@@ -52,14 +52,36 @@ const generateGameEndSound = (): Promise<void> => {
 }
 
 const sounds = {
-    "lobby": bossa,
-    "answerSelect": "",
-    "gameEnd": ""
+    lobby: bossa,
+    answerSelect: "",
+    gameEnd: "",
 }
 
 export default function useSound(audioType: string) {
     const audioRef = useRef<HTMLAudioElement | null>(null)
-    
+
+    // create audio element once and clean up on unmount
+    useEffect(() => {
+        let el: HTMLAudioElement | null = null
+        if (audioType === "lobby" && sounds.lobby) {
+            el = new Audio(sounds.lobby)
+            el.loop = true
+            el.preload = "auto"
+            audioRef.current = el
+        }
+
+        return () => {
+            if (el) {
+                try {
+                    el.pause()
+                    el.currentTime = 0
+                } catch (_) {
+                }
+            }
+            audioRef.current = null
+        }
+    }, [audioType])
+
     const play = useCallback(async () => {
         try {
             if (audioType === "answerSelect") {
@@ -67,8 +89,11 @@ export default function useSound(audioType: string) {
             } else if (audioType === "gameEnd") {
                 await generateGameEndSound()
             } else if (audioRef.current) {
-                audioRef.current.currentTime = 0
-                await audioRef.current.play()
+                // if already playing, don't restart to avoid overlapping
+                if (audioRef.current.paused) {
+                    audioRef.current.currentTime = 0
+                    await audioRef.current.play()
+                }
             }
         } catch (err) {
             console.error("Failed to play audio:", err)
@@ -77,30 +102,14 @@ export default function useSound(audioType: string) {
 
     const stop = useCallback(() => {
         if (audioRef.current) {
-            audioRef.current.pause()
-            audioRef.current.currentTime = 0
+            try {
+                audioRef.current.pause()
+                audioRef.current.currentTime = 0
+            } catch (_) {
+                // ignore
+            }
         }
     }, [])
-
-    let selectedAudio = ""
-    switch (audioType) {
-        case "lobby":
-        case "bossa":
-            selectedAudio = sounds["lobby"]
-            break
-        case "answerSelect":
-            selectedAudio = sounds["answerSelect"]
-            break
-        case "gameEnd":
-            selectedAudio = sounds["gameEnd"]
-            break
-        default:
-            throw new Error("Invalid sound type.")
-    }
-
-    if (selectedAudio) {
-        audioRef.current = new Audio(selectedAudio)
-    }
 
     return { play, stop, audio: audioRef.current }
 }
