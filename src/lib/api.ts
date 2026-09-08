@@ -146,6 +146,10 @@ export const api = {
   createGame: (name: string, question_duration: number, scheduled_at: string) =>
     request("/games", { method: "POST", body: JSON.stringify({ name, question_duration, scheduled_at }) }),
 
+  // Reschedule an existing game
+  rescheduleGame: (gameId: number, scheduled_at: string, question_duration?: number) =>
+    request(`/games/${gameId}/reschedule`, { method: "PUT", body: JSON.stringify({ scheduled_at, question_duration }) }),
+
   getHostGames: () => request("/games/host"),
 
   getGameById: (id: string) => request(`/games/${id}/quiz`),

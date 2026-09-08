@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import BauhausButton from "@/components/BauhausButton";
+import RescheduleModal from "@/components/RescheduleModal";
 import { api, getStoredUser, clearToken, clearStoredUser } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -18,6 +19,7 @@ const HostDashboard = () => {
   const navigate = useNavigate();
   const user = getStoredUser();
   const [games, setGames] = useState<Game[]>([]);
+  const ENABLE_RESCHEDULE = import.meta.env.VITE_ENABLE_RESCHEDULE === "true";
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ name: "", question_duration: 30, scheduled_at: "" });
   const [loading, setLoading] = useState(false);
@@ -155,10 +157,17 @@ const HostDashboard = () => {
                       pin: <span className="tabular font-bold text-foreground">{game.gamePin}</span>
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs uppercase tracking-[0.2em] font-body text-muted-foreground">
-                      {game.question_duration}s per question
-                    </p>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right mr-4">
+                      <p className="text-xs uppercase tracking-[0.2em] font-body text-muted-foreground">
+                        {game.question_duration}s per question
+                      </p>
+                    </div>
+                    <div onClick={(e) => e.stopPropagation()}>
+                      {ENABLE_RESCHEDULE ? (
+                        <RescheduleModal game={game} onSuccess={loadGames} />
+                      ) : null}
+                    </div>
                   </div>
                 </motion.div>
               ))}
