@@ -62,6 +62,8 @@ const PlayerGame = () => {
 
   const { play: playAnswerSound } = useSounds("answerSelect");
   const { play: playGameEndSound } = useSounds("gameEnd");
+  const { play: playCorrectSound } = useSounds("correct");
+  const { play: playWrongSound } = useSounds("wrong");
 
   useEffect(() => {
     const unsubscribeQuestion = on("QUESTION", (payload: any) => {
@@ -106,8 +108,10 @@ const PlayerGame = () => {
 
     const unsubscribeAnswerResult = on("ANSWER_RESULT", (payload: any) => {
       if (payload.isCorrect) {
+        playCorrectSound();
         toast.success(`Correct! +${payload.score.toFixed(2)} points`);
       } else {
+        playWrongSound();
         toast.error(`Wrong! Correct answer: ${payload.correctAnswer}`);
       }
     });

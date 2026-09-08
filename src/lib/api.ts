@@ -87,7 +87,6 @@ async function generateQuestionsWithOpenRouter(prompt: string): Promise<Generate
   if (!OPENROUTER_API_KEY) {
     throw new Error("missing OpenRouter API key. set VITE_OPENROUTER_API_KEY in your env file.");
   }
-
   const res = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
     method: "POST",
     headers: {

@@ -1,23 +1,21 @@
 import { useRef, useCallback, useEffect } from "react"
 import bossa from "../assets/sounds/bossa.mp3"
 
-const generateAnswerSelectSound = (): HTMLAudioElement => {
+const generateAnswerSelectSound = (): void => {
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
     const oscillator = audioContext.createOscillator()
     const gainNode = audioContext.createGain()
-    
+
     oscillator.connect(gainNode)
     gainNode.connect(audioContext.destination)
-    
-    oscillator.frequency.value = 800
+
+    oscillator.frequency.value = 880
     oscillator.type = "sine"
-    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime)
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2)
-    
+    gainNode.gain.setValueAtTime(0.08, audioContext.currentTime)
+    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.12)
+
     oscillator.start(audioContext.currentTime)
-    oscillator.stop(audioContext.currentTime + 0.2)
-    
-    return new Audio()
+    oscillator.stop(audioContext.currentTime + 0.12)
 }
 
 const generateGameEndSound = (): Promise<void> => {
@@ -84,11 +82,15 @@ export default function useSound(audioType: string) {
 
     const play = useCallback(async () => {
         try {
-            if (audioType === "answerSelect") {
-                generateAnswerSelectSound()
-            } else if (audioType === "gameEnd") {
-                await generateGameEndSound()
-            } else if (audioRef.current) {
+                    if (audioType === "answerSelect") {
+                        generateAnswerSelectSound()
+                    } else if (audioType === "correct") {
+                        generateCorrectSound()
+                    } else if (audioType === "wrong") {
+                        generateWrongSound()
+                    } else if (audioType === "gameEnd") {
+                        await generateGameEndSound()
+                    } else if (audioRef.current) {
                 // if already playing, don't restart to avoid overlapping
                 if (audioRef.current.paused) {
                     audioRef.current.currentTime = 0
@@ -112,4 +114,34 @@ export default function useSound(audioType: string) {
     }, [])
 
     return { play, stop, audio: audioRef.current }
+}
+
+const generateCorrectSound = (): void => {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const now = audioContext.currentTime
+    const osc = audioContext.createOscillator()
+    const gain = audioContext.createGain()
+    osc.connect(gain)
+    gain.connect(audioContext.destination)
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(660, now)
+    gain.gain.setValueAtTime(0.12, now)
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18)
+    osc.start(now)
+    osc.stop(now + 0.18)
+}
+
+const generateWrongSound = (): void => {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const now = audioContext.currentTime
+    const osc = audioContext.createOscillator()
+    const gain = audioContext.createGain()
+    osc.connect(gain)
+    gain.connect(audioContext.destination)
+    osc.type = 'sawtooth'
+    osc.frequency.setValueAtTime(220, now)
+    gain.gain.setValueAtTime(0.12, now)
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28)
+    osc.start(now)
+    osc.stop(now + 0.28)
 }

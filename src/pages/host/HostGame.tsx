@@ -279,15 +279,22 @@ const HostGame = () => {
     }
 
     setGeneratingQuestions(true);
-    try {
-      const prompt = [
-        `Generate ${generationPrompt.count} quiz questions about ${generationPrompt.topic.trim()}.`,
-        `Difficulty: ${generationPrompt.difficulty}.`,
-        "Return JSON only with questions shaped like { content, correct_answer, answers }.",
-        "Each question must have exactly 4 answer choices and exactly one correct answer.",
-      ].join(" ");
+    const prompt = [
+      `Generate ${generationPrompt.count} quiz questions about ${generationPrompt.topic.trim()}.`,
+      `Difficulty: ${generationPrompt.difficulty}.`,
+      "Return JSON only with questions shaped like { content, correct_answer, answers }.",
+      "Each question must have exactly 4 answer choices and exactly one correct answer.",
+    ].join(" ");
 
+    const start = Date.now();
+    try {
       const generatedQuestions = await api.generateQuestions(prompt);
+      const duration = Date.now() - start;
+      console.info(`[AI] Generated ${generatedQuestions.length} questions in ${duration}ms`);
+
+      if (duration > 8000) {
+        toast.info("Generation is slow — try reducing count or simplifying the prompt.");
+      }
 
       const mappedQuestions = generatedQuestions.map((question) => ({
         content: question.content,
@@ -298,6 +305,8 @@ const HostGame = () => {
       setQuestions((prev) => [...prev, ...mappedQuestions]);
       toast.success(`generated ${mappedQuestions.length} question(s).`);
     } catch (err: any) {
+      const duration = Date.now() - start;
+      console.warn('[AI] generation failed after', duration, 'ms', err);
       toast.error(err.message || "failed to generate questions.");
     } finally {
       setGeneratingQuestions(false);
