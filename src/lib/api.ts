@@ -164,6 +164,9 @@ export const api = {
   loadQuiz: (quizId: number) =>
     request(`/quizzes/${quizId}`),
 
+  deleteQuiz: (quizId: number) =>
+    request(`/quizzes/${quizId}`, { method: "DELETE" }),
+
   updateQuestion: (questionId: number, content: string, correct_answer: string) =>
     request(`/questions/${questionId}`, { method: "PUT", body: JSON.stringify({ content, correct_answer }) }),
 

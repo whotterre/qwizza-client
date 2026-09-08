@@ -459,12 +459,34 @@ const HostGame = () => {
                       <p className="text-xs uppercase tracking-[0.2em] font-body font-medium text-muted-foreground">step 2 — add questions</p>
                       <p className="font-display font-black text-lg tracking-tighter mt-1">"{quizTitle}"</p>
                     </div>
-                    {savedQuestions && (
-                      <div className="bg-accent border-2 border-foreground px-3 py-1 flex items-center gap-2">
-                        <CheckCircle className="w-3 h-3" />
-                        <p className="text-xs uppercase tracking-[0.2em] font-body font-bold text-accent-foreground">saved</p>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-3">
+                      {savedQuestions && (
+                        <div className="bg-accent border-2 border-foreground px-3 py-1 flex items-center gap-2">
+                          <CheckCircle className="w-3 h-3" />
+                          <p className="text-xs uppercase tracking-[0.2em] font-body font-bold text-accent-foreground">saved</p>
+                        </div>
+                      )}
+                      {quizId && (
+                        <button
+                          onClick={async () => {
+                            if (!window.confirm('Are you sure you want to delete this quiz? This cannot be undone.')) return;
+                            try {
+                              await api.deleteQuiz(quizId);
+                              setQuizId(null);
+                              setQuestions([emptyQuestion()]);
+                              setSavedQuestions(false);
+                              toast.success('Quiz deleted.');
+                            } catch (err: any) {
+                              toast.error(err.message || 'Failed to delete quiz.');
+                            }
+                          }}
+                          className="text-xs uppercase tracking-[0.2em] font-body font-bold px-4 py-2 border-2 border-foreground bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          title="delete quiz"
+                        >
+                          delete quiz
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="border-2 border-foreground bg-secondary p-6 space-y-4">
