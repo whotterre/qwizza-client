@@ -20,7 +20,9 @@ const PlayerResults = () => {
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
+      setLoading(true);
       if (!gameId || !nickname) {
+        setLeaderboard([]);
         setLoading(false);
         return;
       }
@@ -42,7 +44,8 @@ const PlayerResults = () => {
           setPosition(playerPosition);
         }
       } catch (error) {
-        // Silently fail - display loading state or error message in UI if needed
+        // If backend returned 404 or error, show empty leaderboard and allow retry
+        setLeaderboard([]);
       } finally {
         setLoading(false);
       }
@@ -53,13 +56,41 @@ const PlayerResults = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {loading || (score === 0 && leaderboard.length === 0) ? (
+      {loading ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <p className="text-2xl font-display font-black tracking-tighter mb-2">
-              loading results...
-            </p>
+            <p className="text-2xl font-display font-black tracking-tighter mb-2">loading results...</p>
             <p className="text-muted-foreground">waiting for final scores</p>
+          </div>
+        </div>
+      ) : leaderboard.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-2xl font-display font-black tracking-tighter mb-2">no results yet</p>
+            <p className="text-muted-foreground mb-4">final scores are not available for this game.</p>
+            <div className="flex justify-center gap-3">
+              <BauhausButton color="primary" onClick={() => {
+                // trigger a reload by updating state (call same fetch logic)
+                setLoading(true);
+                (async () => {
+                  try {
+                    const response = await api.getFinalLeaderboard(parseInt(gameId || "0"));
+                    const finalLeaderboard = response.leaderboard || [];
+                    setLeaderboard(finalLeaderboard);
+                    const playerEntry = finalLeaderboard.find((entry: any) => entry.nickname === nickname);
+                    if (playerEntry) {
+                      setScore(playerEntry.score);
+                      setPosition(finalLeaderboard.findIndex((entry: any) => entry.nickname === nickname) + 1);
+                    }
+                  } catch (e) {
+                    setLeaderboard([]);
+                  } finally {
+                    setLoading(false);
+                  }
+                })();
+              }}>retry</BauhausButton>
+              <BauhausButton color="foreground" onClick={() => navigate("/")}>back</BauhausButton>
+            </div>
           </div>
         </div>
       ) : (

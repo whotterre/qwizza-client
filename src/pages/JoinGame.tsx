@@ -20,7 +20,7 @@ const JoinGame = () => {
     setLoading(true);
     try {
       const response = await api.joinGame(pin, nickname.trim());
-      localStorage.setItem("qwizza_player_nickname", nickname.trim());
+      localStorage.setItem("qwizza_player_nickname", nickname.trim().toUpperCase());
       
       // Store gameId if available in response
       if (response?.game_id) {

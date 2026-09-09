@@ -83,12 +83,16 @@ const HostGame = () => {
           setQuizTitle(quizTitle);
           
           if (gameData.quiz?.questions) {
-            const loadedQuestions: QuestionDraft[] = gameData.quiz.questions.map((q: any) => ({
-              qu_id: q.qu_id,
-              content: q.content,
-              correct_answer: q.correct_answer,
-              answers: (q.answers || []).map((a: Answer) => a.content),
-            }));
+            const loadedQuestions: QuestionDraft[] = gameData.quiz.questions.map((q: any) => {
+              const raw = (q.answers || []).map((a: any) => (typeof a === "string" ? a : a?.content || "")).filter(Boolean);
+              const answersList = raw.length >= 2 ? raw : [q.correct_answer || "Option A", "Option B", "Option C", "Option D"];
+              return {
+                qu_id: q.qu_id,
+                content: q.content,
+                correct_answer: q.correct_answer,
+                answers: answersList,
+              };
+            });
             setQuestions(loadedQuestions);
             setSavedQuestions(true);
             toast.success(`loaded ${loadedQuestions.length} existing question(s).`);
@@ -146,12 +150,16 @@ const HostGame = () => {
         if (quizData.questions && quizData.questions.length > 0) {
           // Map existing questions to draft format
           const loadedQuestions: QuestionDraft[] = quizData.questions.map(
-            (q: any) => ({
-              qu_id: q.qu_id,
-              content: q.content,
-              correct_answer: q.correct_answer,
-              answers: (q.answers || []).map((a: Answer) => a.content),
-            })
+            (q: any) => {
+              const raw = (q.answers || []).map((a: any) => (typeof a === "string" ? a : a?.content || "")).filter(Boolean);
+              const answersList = raw.length >= 2 ? raw : [q.correct_answer || "Option A", "Option B", "Option C", "Option D"];
+              return {
+                qu_id: q.qu_id,
+                content: q.content,
+                correct_answer: q.correct_answer,
+                answers: answersList,
+              };
+            }
           );
           
           // Build answer map for reference
@@ -251,16 +259,24 @@ const HostGame = () => {
 
   const updateAnswer = (qIdx: number, aIdx: number, value: string) => {
     setQuestions((prev) =>
-      prev.map((q, i) =>
-        i === qIdx ? { ...q, answers: q.answers.map((a, j) => (j === aIdx ? value : a)) } : q
-      )
+      prev.map((q, i) => {
+        if (i !== qIdx) return q;
+        const oldAnswerValue = q.answers[aIdx];
+        const isCurrentlyCorrect = q.correct_answer === oldAnswerValue || (!q.correct_answer && aIdx === 0);
+        const newAnswers = q.answers.map((a, j) => (j === aIdx ? value : a));
+        return {
+          ...q,
+          answers: newAnswers,
+          correct_answer: isCurrentlyCorrect ? value : q.correct_answer,
+        };
+      })
     );
   };
 
   const setCorrectAnswer = (qIdx: number, aIdx: number) => {
     setQuestions((prev) =>
       prev.map((q, i) =>
-        i === qIdx ? { ...q, correct_answer: q.answers[aIdx] } : q
+        i === qIdx ? { ...q, correct_answer: q.answers[aIdx] || "" } : q
       )
     );
   };
@@ -324,14 +340,24 @@ const HostGame = () => {
       toast.error("Only existing questions can be updated individually.");
       return;
     }
-    if (!q.content.trim() || !q.correct_answer.trim()) {
-      toast.error("Question needs content and a correct answer.");
+    if (!q.content.trim()) {
+      toast.error("Question needs content.");
       return;
+    }
+    const cleanAnswers = q.answers.map((a) => a.trim()).filter(Boolean);
+    let correct = q.correct_answer.trim();
+    if (!cleanAnswers.some((ans) => ans.toLowerCase() === correct.toLowerCase()) && cleanAnswers.length > 0) {
+      correct = cleanAnswers[0];
     }
 
     setUpdatingQuestionId(q.qu_id);
     try {
-      await api.updateQuestion(q.qu_id, q.content.trim(), q.correct_answer.trim());
+      await api.updateQuestion(
+        q.qu_id,
+        q.content.trim(),
+        correct,
+        cleanAnswers
+      );
       toast.success("Question updated!");
     } catch (err: any) {
       toast.error(err.message || "failed to update question.");
@@ -345,38 +371,74 @@ const HostGame = () => {
       toast.error("create a quiz first.");
       return;
     }
-    const valid = questions.every(
-      (q) => q.content.trim() && q.correct_answer.trim() && q.answers.filter((a) => a.trim()).length >= 2
+
+    const validatedQuestions = questions.map((q) => {
+      const cleanAnswers = q.answers.map((a) => a.trim()).filter(Boolean);
+      let correct = q.correct_answer.trim();
+      if (!cleanAnswers.some((ans) => ans.toLowerCase() === correct.toLowerCase()) && cleanAnswers.length > 0) {
+        correct = cleanAnswers[0];
+      }
+      return {
+        ...q,
+        content: q.content.trim(),
+        correct_answer: correct,
+        answers: cleanAnswers,
+      };
+    });
+
+    const valid = validatedQuestions.every(
+      (q) => q.content && q.correct_answer && q.answers.length >= 2
     );
     if (!valid) {
       toast.error("each question needs content, at least 2 answers, and a correct answer selected.");
       return;
     }
+
     setSavingQuestions(true);
     try {
-      // Separate new questions from existing ones
-      const newQuestions = questions.filter(q => !q.qu_id);
-      const existingQuestions = questions.filter(q => q.qu_id);
+      const newQuestions = validatedQuestions.filter(q => !q.qu_id);
+      const existingQuestions = validatedQuestions.filter(q => q.qu_id);
 
-      // Save new questions
       if (newQuestions.length > 0) {
         const cleaned = newQuestions.map((q) => ({
-          content: q.content.trim(),
-          correct_answer: q.correct_answer.trim(),
+          content: q.content,
+          correct_answer: q.correct_answer,
+          answers: q.answers,
         }));
         await api.addQuestions(quizId, cleaned);
         toast.success(`${cleaned.length} new question(s) saved.`);
       }
 
-      // Update existing questions
       for (const q of existingQuestions) {
         if (q.qu_id) {
-          await api.updateQuestion(q.qu_id, q.content.trim(), q.correct_answer.trim());
+          await api.updateQuestion(
+            q.qu_id,
+            q.content,
+            q.correct_answer,
+            q.answers
+          );
         }
       }
 
       if (existingQuestions.length > 0) {
         toast.success(`${existingQuestions.length} question(s) updated.`);
+      }
+
+      // Re-fetch quiz state to bind qu_ids to newly added questions
+      const freshData = await api.loadQuiz(quizId);
+      const quizData = freshData.quiz || freshData;
+      if (quizData.questions && quizData.questions.length > 0) {
+        const loadedQuestions: QuestionDraft[] = quizData.questions.map((q: any) => {
+          const raw = (q.answers || []).map((a: any) => (typeof a === "string" ? a : a?.content || "")).filter(Boolean);
+          const answersList = raw.length >= 2 ? raw : [q.correct_answer || "Option A", "Option B", "Option C", "Option D"];
+          return {
+            qu_id: q.qu_id,
+            content: q.content,
+            correct_answer: q.correct_answer,
+            answers: answersList,
+          };
+        });
+        setQuestions(loadedQuestions);
       }
 
       setSavedQuestions(true);
